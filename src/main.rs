@@ -1,18 +1,22 @@
 //todo@ remove unused imports
 use clap::Parser;
 use lazy_regex::regex;
+use once_cell::sync::OnceCell;
 use std::{
     env::var_os,
     fs::{metadata, read_dir, File},
     io::{BufRead, BufReader},
     path::Path,
     process::exit,
+    sync::Mutex,
     thread,
 };
 
 static mut DID_PRINT: bool = false;
 static mut COLOR: bool = true;
 static mut SINGLE_THREAD: bool = false;
+
+static PRINT_LOCK: OnceCell<Mutex<bool>> = OnceCell::new();
 
 /// static mut wrapper
 macro_rules! static_var {
@@ -90,10 +94,15 @@ enum Cargo {
     version
 )]
 struct Todo {
-    #[clap(short, long, help="Either a file or a directory", default_value = "./src")]
+    #[clap(
+        short,
+        long,
+        help = "Either a file or a directory",
+        default_value = "./src"
+    )]
     path: String,
 
-    #[clap(short, long, help="Limit CPU usage to a single OS thread")]
+    #[clap(short, long, help = "Limit CPU usage to a single OS thread")]
     single_thread: bool,
 }
 
@@ -131,6 +140,8 @@ fn walk_dir<P: AsRef<Path>>(path: P) {
                     {
                         static_var!(DID_PRINT = true);
 
+                        let _lock = PRINT_LOCK.get().unwrap().lock();
+
                         println!("{}---{}", color!(blue), color!(white),);
 
                         println!(
@@ -164,6 +175,8 @@ fn walk_dir<P: AsRef<Path>>(path: P) {
 
 fn main() {
     static_var!(COLOR = var_os("NO_COLOR").is_none());
+
+    PRINT_LOCK.set(Mutex::new(false)).unwrap();
 
     let Cargo::Todo(args) = Cargo::parse();
 
