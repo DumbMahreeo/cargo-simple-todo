@@ -129,14 +129,13 @@ fn walk_dir<P: AsRef<Path>>(path: P) {
                             counter,
                         );
 
-                        println!("{}Comment:{}",
-                            color!(yellow),
-                            color!(white),
-                        );
                         let comment = &captures["comment"].trim();
 
                         if !comment.is_empty() {
-                            println!("\t{comment}");
+                            println!("{}Comment:{}\n\t{comment}",
+                                color!(yellow),
+                                color!(white),
+                            );
                         }
 
                         println!();
