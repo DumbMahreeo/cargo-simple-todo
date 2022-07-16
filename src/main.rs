@@ -1,19 +1,27 @@
 //todo@ remove unused imports
-use std::{fs::{read_dir, metadata, File}, io::{BufReader, BufRead}, path::Path, thread, env::var_os};
-use lazy_regex::regex;
 use clap::Parser;
+use lazy_regex::regex;
+use std::{
+    env::var_os,
+    fs::{metadata, read_dir, File},
+    io::{BufRead, BufReader},
+    path::Path,
+    process::exit,
+    thread,
+};
 
 static mut DID_PRINT: bool = false;
 static mut COLOR: bool = true;
+static mut SINGLE_THREAD: bool = false;
 
 /// static mut wrapper
 macro_rules! static_var {
     ($var:ident) => {
-        unsafe {$var}
+        unsafe { $var }
     };
 
     ($var:ident = $value:expr) => {
-        unsafe {$var = $value}
+        unsafe { $var = $value }
     };
 }
 
@@ -68,7 +76,6 @@ macro_rules! color {
     }
 }
 
-
 #[derive(Parser)]
 #[clap(name = "cargo")]
 #[clap(bin_name = "cargo")]
@@ -78,13 +85,16 @@ enum Cargo {
 
 #[derive(clap::Args)]
 #[clap(
-    after_help="To disable colored output, execute with environment variable NO_COLOR",
+    after_help = "To disable colored output, execute with environment variable NO_COLOR\n\n",
     about,
-    version,
+    version
 )]
 struct Todo {
-    #[clap(short, long, default_value = "./src")]
+    #[clap(short, long, help="Either a file or a directory", default_value = "./src")]
     path: String,
+
+    #[clap(short, long, help="Limit CPU usage to a single OS thread")]
+    single_thread: bool,
 }
 
 fn walk_dir<P: AsRef<Path>>(path: P) {
@@ -93,12 +103,19 @@ fn walk_dir<P: AsRef<Path>>(path: P) {
             if let Ok(dir) = read_dir(&path) {
                 let mut handles = Vec::new();
                 for entry in dir.flatten() {
+                    if static_var!(SINGLE_THREAD) {
+                        walk_dir(entry.path());
+                        continue;
+                    }
                     handles.push(thread::spawn(move || walk_dir(entry.path())));
                 }
 
-                for handle in handles {
-                    if handle.join().is_err() {
-                        eprintln!("[FATAL]: thread panicked");
+                if !static_var!(SINGLE_THREAD) {
+                    for handle in handles {
+                        if handle.join().is_err() {
+                            eprintln!("[FATAL]: thread panicked");
+                            exit(255);
+                        }
                     }
                 }
             }
@@ -109,33 +126,26 @@ fn walk_dir<P: AsRef<Path>>(path: P) {
                 let mut counter = 1;
 
                 while let Ok(bytes_read) = file.read_line(&mut line) {
-                    if let Some(captures) = regex!(r"//[\s\S]*@[Tt][Oo][Dd][Oo][\s:]*(?P<comment>.*)").captures(&line) {
+                    if let Some(captures) =
+                        regex!(r"//[\s\S]*@[Tt][Oo][Dd][Oo][\s:]*(?P<comment>.*)").captures(&line)
+                    {
                         static_var!(DID_PRINT = true);
 
-                        println!("{}---{}",
-                            color!(blue),
-                            color!(white),
-                        );
+                        println!("{}---{}", color!(blue), color!(white),);
 
-                        println!("\n{}File:{} {}",
+                        println!(
+                            "\n{}File:{} {}",
                             color!(yellow),
                             color!(white),
                             path.as_ref().display(),
                         );
 
-                        println!("{}Line:{} {}",
-                            color!(yellow),
-                            color!(white),
-                            counter,
-                        );
+                        println!("{}Line:{} {}", color!(yellow), color!(white), counter,);
 
                         let comment = &captures["comment"].trim();
 
                         if !comment.is_empty() {
-                            println!("{}Comment:{}\n\t{comment}",
-                                color!(yellow),
-                                color!(white),
-                            );
+                            println!("{}Comment:{}\n\t{comment}", color!(yellow), color!(white),);
                         }
 
                         println!();
@@ -157,17 +167,14 @@ fn main() {
 
     let Cargo::Todo(args) = Cargo::parse();
 
+    static_var!(SINGLE_THREAD = args.single_thread);
+
     walk_dir(&args.path);
 
     if static_var!(DID_PRINT) {
-        println!("{}---{}",
-            color!(blue),
-            color!(reset),
-        );
+        println!("{}---{}", color!(blue), color!(reset),);
+        exit(1)
     } else {
-        println!("{}No todo(s) found{}",
-            color!(green),
-            color!(reset),
-        );
+        println!("{}No todo(s) found{}", color!(green), color!(reset),);
     }
 }

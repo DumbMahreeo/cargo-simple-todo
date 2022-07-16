@@ -28,6 +28,17 @@ Then execute `cargo todo`.
 
 Try with `cargo todo --help` for further usage info.
 
+## Exit code
+
+-   If any todos are found, exit code `1` is returned to allow use in
+    CI.
+
+-   For general errors, exit code `255` is returned.
+
+Thanks to
+[orenbenkiki/cargo-todox](https://github.com/orenbenkiki/cargo-todox)
+for the inspiration on this one.
+
 ## Warning
 
 [probablyclem/cargo-todo](https://github.com/ProbablyClem/cargo-todo)
