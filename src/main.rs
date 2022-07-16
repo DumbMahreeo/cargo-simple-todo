@@ -68,9 +68,21 @@ macro_rules! color {
     }
 }
 
+
 #[derive(Parser)]
-#[clap(version, about, long_about = None, after_help="To disable colored output, execute with environment variable NO_COLOR")]
-struct Args {
+#[clap(name = "cargo")]
+#[clap(bin_name = "cargo")]
+enum Cargo {
+    Todo(Todo),
+}
+
+#[derive(clap::Args)]
+#[clap(
+    after_help="To disable colored output, execute with environment variable NO_COLOR",
+    about,
+    version,
+)]
+struct Todo {
     #[clap(short, long, default_value = "./src")]
     path: String,
 }
@@ -144,7 +156,7 @@ fn walk_dir<P: AsRef<Path>>(path: P) {
 fn main() {
     static_var!(COLOR = var_os("NO_COLOR").is_none());
 
-    let args = Args::parse();
+    let Cargo::Todo(args) = Cargo::parse();
 
     walk_dir(&args.path);
 
